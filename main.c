@@ -1,28 +1,46 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/_types/_pid_t.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#define BUFF_SIZE 1024
+#define TOK_SIZE 64
+
 char *fsh_read_line() {
   printf(">>> ");
+  fflush(stdout);
 
-  int line_size = 1024, position = 0, c;
-  char *buffer = malloc(sizeof(char) * line_size);
+  int position = 0;
+  int c;
+  int buffer_size = BUFF_SIZE;
+  char *buffer = malloc(sizeof(char) * buffer_size);
 
   if (!buffer) {
     fprintf(stderr, "fsh: allocation error\n");
     exit(EXIT_FAILURE);
   }
 
-  while ((c = getchar()) != EOF && c != '\n') {
+  while (1) {
+    c = getchar();
+
+    if (c == EOF) {
+      free(buffer);
+      exit(EXIT_SUCCESS);
+    }
+
+    if (c == '\n') {
+      *(buffer + position) = '\0';
+      return buffer;
+    }
+
     *(buffer + position) = c;
     position++;
 
-    if (position >= line_size) {
-      line_size += line_size;
-      buffer = realloc(buffer, line_size);
+    if (position >= buffer_size) {
+      buffer_size += BUFF_SIZE;
+      buffer = realloc(buffer, buffer_size);
 
       if (!buffer) {
         fprintf(stderr, "fsh: allocation error\n");
@@ -30,13 +48,11 @@ char *fsh_read_line() {
       }
     }
   }
-
-  *(buffer + position) = '\0';
-  return buffer;
 }
 
 char **fsh_parse_line(char *line) {
-  int token_size = 64, position = 0;
+  int token_size = TOK_SIZE;
+  int position = 0;
   char **tokens = malloc(sizeof(char *) * token_size);
   char *token;
 
@@ -50,8 +66,8 @@ char **fsh_parse_line(char *line) {
     *(tokens + position) = token;
     position++;
 
-    if (position >= token_size) {
-      token_size += token_size;
+    if (position >= token_size - 1) {
+      token_size += TOK_SIZE;
       tokens = realloc(tokens, sizeof(char *) * token_size);
 
       if (!tokens) {
@@ -67,11 +83,12 @@ char **fsh_parse_line(char *line) {
   return tokens;
 }
 
-int fsh_execute(char **args) {
+int fsh_launch(char **args) {
   pid_t pid, wpid;
   int status;
 
   pid = fork();
+
   if (pid == 0) {
     if (execvp(args[0], args) == -1) {
       perror("fsh");
@@ -89,14 +106,16 @@ int fsh_execute(char **args) {
 }
 
 int fsh_cd(char **args);
-int fsh_exit(char **args);
+int fsh_pwd(char **args);
+// int fsh_echo(char **args);
 int fsh_help(char **args);
+int fsh_exit(char **args);
 
-char *builtin_str[] = {"cd", "exit", "help"};
-
-int (*builtin_func[])(char **) = {&fsh_cd, &fsh_exit, &fsh_help};
+char *builtin_str[] = {"cd", "pwd", "help", "exit"};
 
 int fsh_num_builtins() { return sizeof(builtin_str) / sizeof(char *); }
+
+int (*builtin_func[])(char **args) = {&fsh_cd, &fsh_pwd, &fsh_help, &fsh_exit};
 
 int fsh_cd(char **args) {
   if (args[1] == NULL) {
@@ -110,20 +129,57 @@ int fsh_cd(char **args) {
   return 1;
 }
 
-int fsh_exit(char **args) { return 0; }
+int fsh_pwd(char **args) {
+  int buffer_size = BUFF_SIZE;
+  char *buffer = malloc(sizeof(char) * buffer_size);
+
+  if (!buffer) {
+    fprintf(stderr, "fsh: allocation error\n");
+    exit(EXIT_FAILURE);
+  }
+
+  if (getcwd(buffer, buffer_size) != NULL) {
+    printf("%s\n", buffer);
+  } else {
+    perror("fsh: pwd");
+  }
+
+  free(buffer);
+
+  return 1;
+}
+
+// fsh_echo() {}
 
 int fsh_help(char **args) {
   int i;
-  printf("Favour Alofe's FSH\n");
+  printf("Favour's Shell (fsh)!\n");
   printf("Type program names and arguments, and hit enter.\n");
-  printf("The following commands are built in: \n");
 
-  for (int i = 0; i < fsh_num_builtins(); i++) {
+  printf("The following commands are built-in: \n");
+  for (i = 0; i < fsh_num_builtins(); i++) {
     printf("  %s\n", *(builtin_str + i));
   }
 
   printf("Use the 'man' command for information on other programs.\n");
+
   return 1;
+}
+
+int fsh_exit(char **args) { return 0; }
+
+int fsh_execute(char **args) {
+  if (args[0] == NULL) {
+    return 1;
+  }
+
+  for (int i = 0; i < fsh_num_builtins(); i++) {
+    if (strcmp(args[0], builtin_str[i]) == 0) {
+      return (*builtin_func[i])(args);
+    }
+  }
+
+  return fsh_launch(args);
 }
 
 void fsh_loop() {
@@ -135,11 +191,14 @@ void fsh_loop() {
     line = fsh_read_line();
     args = fsh_parse_line(line);
     status = fsh_execute(args);
+
+    free(line);
+    free(args);
   } while (status);
 }
 
 int main(int argc, char **argv) {
-  printf("Welcome to Favour's Shell (fsh)!\n");
+  printf("Welcome Favour's Shell! Enjoy your stay! \n");
 
   fsh_loop();
 
