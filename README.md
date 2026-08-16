@@ -38,6 +38,26 @@ The lifetime of a shell is a basic loop (Reading input -> Parsing a line -> Exec
 
 ---
 
+## Getting Started
+
+### Prerequisites
+- GCC / Clang
+- POSIX-compliant environment (Linux/MacOS)
+
+### Compilation
+- Compile the source using `gcc`.
+
+```bash
+gcc -Wall -Wextra -pedantic -std=c99 main.c -o myshell
+```
+
+### Running the Shell
+```bash
+./myshell
+```
+
+---
+
 ## Next Steps
 - [ ] Piping: Connecting multiple processes
 
