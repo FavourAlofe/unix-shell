@@ -8,8 +8,53 @@
 #define BUFF_SIZE 1024
 #define TOK_SIZE 64
 
+char *fsh_parse_dir() {
+  int pos = 0;
+  int token_size = TOK_SIZE;
+  char **tokens = malloc(sizeof(char *) * token_size);
+  char *token, *curr_dir;
+  char *line = malloc(sizeof(char) * BUFF_SIZE);
+
+  getcwd(line, BUFF_SIZE);
+
+  token = strtok(line, "/");
+  while (token) {
+    *(tokens + pos) = token;
+    pos++;
+
+    if (pos >= token_size - 1) {
+      token_size += TOK_SIZE;
+      tokens = realloc(tokens, sizeof(char *) * token_size);
+
+      if (!tokens) {
+        fprintf(stderr, "fsh: allocation error\n");
+        exit(EXIT_FAILURE);
+      }
+    }
+
+    token = strtok(NULL, "/");
+  }
+
+  free(line);
+
+  *(tokens + pos) = NULL;
+  curr_dir = tokens[pos - 1];
+  free(tokens);
+
+  return curr_dir;
+}
+
 char *fsh_read_line() {
-  printf(">>> ");
+
+  char *name = "favour";
+  char *token = fsh_parse_dir();
+
+  if (strcmp(token, name) == 0) {
+    printf("favour@fsh:~ >>> ");
+  } else {
+    printf("favour@fsh:~%s >>> ", token);
+  }
+
   fflush(stdout);
 
   int position = 0;
